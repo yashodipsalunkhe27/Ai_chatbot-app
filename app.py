@@ -1,5 +1,3 @@
-
-
 import streamlit as st
 import os
 from dotenv import load_dotenv
@@ -10,7 +8,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 
 from pypdf import PdfReader
 from PIL import Image
-import requests   # ✅ NEW (for OCR API)
+import requests
+
+# ✅ FIX 1: Force session initialization
+st.session_state
 
 # ==============================
 # 🎨 UI CONFIG (SAME)
@@ -66,12 +67,11 @@ def generate_pdf(history):
     return buffer
 
 # ==============================
-# 📄 TEXT EXTRACTION (UPDATED)
+# 📄 TEXT EXTRACTION (SAME)
 # ==============================
 def extract_text(file):
     text = ""
 
-    # ✅ PDF
     if file.type == "application/pdf":
         pdf = PdfReader(file)
         for page in pdf.pages:
@@ -79,13 +79,12 @@ def extract_text(file):
             if extracted:
                 text += extracted + "\n"
 
-    # ✅ IMAGE / SCREENSHOT (OCR API)
     elif "image" in file.type:
         try:
             response = requests.post(
                 "https://api.ocr.space/parse/image",
                 files={"file": file},
-                data={"apikey": "helloworld"}  # free demo key
+                data={"apikey": "helloworld"}
             )
 
             result = response.json()
@@ -98,7 +97,6 @@ def extract_text(file):
         except Exception as e:
             text = f"OCR failed: {str(e)}"
 
-    # ✅ fallback
     if not text.strip():
         text = "No text could be extracted from the file."
 
@@ -126,40 +124,6 @@ llm = ChatGroq(
 )
 
 # ==============================
-# 💬 CHAT INPUT
-# ==============================
-user_input = st.chat_input("Ask something...")
-
-if user_input:
-    question = user_input.lower()
-
-    if any(word in question for word in ["short", "brief"]):
-        style_instruction = "Answer in very short 2-3 lines."
-    elif any(word in question for word in ["detailed", "explain", "deep"]):
-        style_instruction = "Give a detailed and well-explained answer."
-    else:
-        style_instruction = "Answer normally."
-
-    context = st.session_state.doc_text
-
-    prompt = f"""
-You are a helpful AI assistant.
-
-{style_instruction}
-
-Context:
-{context}
-
-Question:
-{question}
-"""
-
-    answer = llm.invoke(prompt).content
-
-    st.session_state.history.append({"question": question, "answer": answer})
-    st.session_state.current_chat = [{"question": question, "answer": answer}]
-
-# ==============================
 # 🖥️ MAIN UI (SAME)
 # ==============================
 st.markdown("<h1 style='text-align:center;'>🤖 Nexa AI</h1>", unsafe_allow_html=True)
@@ -169,7 +133,7 @@ for chat in st.session_state.current_chat:
     st.chat_message("assistant").write(chat["answer"])
 
 # ==============================
-# 📂 SIDEBAR (SAME STRUCTURE)
+# 📂 SIDEBAR (SAME)
 # ==============================
 with st.sidebar:
     st.title("📜 Chat History")
@@ -214,6 +178,42 @@ with st.sidebar:
         st.rerun()
 
     st.download_button("📥 Download Chat", generate_pdf(st.session_state.history), "chat.pdf")
+
+# ==============================
+# 💬 CHAT INPUT (FIXED POSITION)
+# ==============================
+user_input = st.chat_input("Ask something...")
+
+if user_input:
+    question = user_input.lower()
+
+    if any(word in question for word in ["short", "brief"]):
+        style_instruction = "Answer in very short 2-3 lines."
+    elif any(word in question for word in ["detailed", "explain", "deep"]):
+        style_instruction = "Give a detailed and well-explained answer."
+    else:
+        style_instruction = "Answer normally."
+
+    context = st.session_state.doc_text
+
+    prompt = f"""
+You are a helpful AI assistant.
+
+{style_instruction}
+
+Context:
+{context}
+
+Question:
+{question}
+"""
+
+    answer = llm.invoke(prompt).content
+
+    st.session_state.history.append({"question": question, "answer": answer})
+    st.session_state.current_chat = [{"question": question, "answer": answer}]
+
+    st.rerun()  # ✅ important
 
 # ==============================
 # Footer (SAME)
