@@ -64,7 +64,7 @@ if "file_reset" not in st.session_state:
     st.session_state.file_reset = False
 
 # ==============================
-# PDF / IMAGE TEXT EXTRACTION
+# TEXT EXTRACTION
 # ==============================
 def extract_text(file):
     text = ""
@@ -93,7 +93,7 @@ def extract_text(file):
     return text.strip()
 
 # ==============================
-# SIMPLE RAG RETRIEVAL (IMPORTANT)
+# RAG RETRIEVAL
 # ==============================
 def get_relevant_chunks(text, query, chunk_size=500, top_k=4):
     words = query.lower().split()
@@ -147,7 +147,7 @@ for chat in st.session_state.current_chat:
     st.chat_message("assistant").write(chat["answer"])
 
 # ==============================
-# SIDEBAR
+# SIDEBAR (FIXED - SINGLE BLOCK ONLY)
 # ==============================
 with st.sidebar:
     st.title("📜 Chat History")
@@ -185,10 +185,7 @@ with st.sidebar:
 
     st.markdown("---")
 
-with st.sidebar:
-
-    st.markdown("---")
-
+    # ✅ ONLY ONE SET OF BUTTONS (FIX)
     if st.button("🧹 Clear Chat"):
         st.session_state.history = []
         st.session_state.current_chat = []
@@ -204,7 +201,7 @@ with st.sidebar:
     )
 
 # ==============================
-# CHAT INPUT (HYBRID LOGIC FIX)
+# CHAT INPUT
 # ==============================
 user_input = st.chat_input("Ask something...")
 
@@ -214,7 +211,6 @@ if user_input:
 
     has_doc = context and len(context.strip()) > 50
 
-    # STYLE
     if "short" in question:
         style = "Answer in 2-3 lines."
     elif "detailed" in question:
@@ -222,13 +218,8 @@ if user_input:
     else:
         style = "Answer normally."
 
-    # DOCUMENT INTENT CHECK
     doc_keywords = ["document", "file", "uploaded", "this document", "from document"]
     is_doc_question = any(word in question for word in doc_keywords)
-
-    # ==============================
-    # 🔥 HYBRID LOGIC (MAIN FIX)
-    # ==============================
 
     if has_doc and is_doc_question:
         relevant_context = get_relevant_chunks(context, question)
@@ -248,7 +239,6 @@ DOCUMENT:
 QUESTION:
 {question}
 """
-
     else:
         prompt = f"""
 You are a helpful AI assistant.
