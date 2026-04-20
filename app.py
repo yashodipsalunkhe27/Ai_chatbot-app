@@ -147,7 +147,7 @@ for chat in st.session_state.current_chat:
     st.chat_message("assistant").write(chat["answer"])
 
 # ==============================
-# SIDEBAR (FIXED - SINGLE BLOCK ONLY)
+# SIDEBAR (FIXED - SINGLE CLEAN BLOCK)
 # ==============================
 with st.sidebar:
     st.title("📜 Chat History")
@@ -178,14 +178,20 @@ with st.sidebar:
 
     st.markdown("---")
 
+    # ==============================
+    # FIXED HISTORY BUTTONS (NO DUPLICATES)
+    # ==============================
     for i, item in enumerate(reversed(st.session_state.history)):
-        if st.button(item["question"][:40], key=f"hist_{i}"):
-            st.session_state.current_chat = [item]
-            st.rerun()
+        st.button(
+            item["question"][:40],
+            key=f"history_{i}_{item['question']}"
+        )
 
     st.markdown("---")
 
-    # ✅ ONLY ONE SET OF BUTTONS (FIX)
+    # ==============================
+    # SINGLE CLEAN BUTTONS (FIXED)
+    # ==============================
     if st.button("🧹 Clear Chat"):
         st.session_state.history = []
         st.session_state.current_chat = []
