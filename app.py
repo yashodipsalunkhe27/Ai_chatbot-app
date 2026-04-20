@@ -1,6 +1,5 @@
 import streamlit as st
 
-# ✅ MUST BE FIRST STREAMLIT COMMAND
 st.set_page_config(page_title="AI Chatbot", page_icon="🤖", layout="wide")
 
 import os
@@ -9,12 +8,12 @@ from langchain_groq import ChatGroq
 import io
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
+
 from pypdf import PdfReader
-from PIL import Image
 import requests
 
 # ==============================
-# 🎨 UI CONFIG
+# UI (UNCHANGED)
 # ==============================
 st.markdown("""
 <style>
@@ -34,7 +33,7 @@ section[data-testid="stChatInput"] textarea {
 """, unsafe_allow_html=True)
 
 # ==============================
-# 🔐 API KEY
+# API KEY
 # ==============================
 load_dotenv()
 api_key = os.getenv("GROQ_API_KEY")
@@ -44,26 +43,28 @@ if not api_key:
     st.stop()
 
 # ==============================
-# 📄 PDF GENERATOR
+# SESSION STATE
 # ==============================
-def generate_pdf(history):
-    buffer = io.BytesIO()
-    doc = SimpleDocTemplate(buffer)
-    styles = getSampleStyleSheet()
-    elements = []
+if "history" not in st.session_state:
+    st.session_state.history = []
 
-    for chat in history:
-        elements.append(Paragraph(f"<b>User:</b> {chat['question']}", styles["Normal"]))
-        elements.append(Spacer(1, 8))
-        elements.append(Paragraph(f"<b>Assistant:</b> {chat['answer']}", styles["Normal"]))
-        elements.append(Spacer(1, 12))
+if "current_chat" not in st.session_state:
+    st.session_state.current_chat = []
 
-    doc.build(elements)
-    buffer.seek(0)
-    return buffer
+if "doc_text" not in st.session_state:
+    st.session_state.doc_text = ""
+
+if "last_file" not in st.session_state:
+    st.session_state.last_file = None
+
+if "doc_loaded" not in st.session_state:
+    st.session_state.doc_loaded = False
+
+if "file_reset" not in st.session_state:
+    st.session_state.file_reset = False
 
 # ==============================
-# 📄 TEXT EXTRACTION
+# PDF / IMAGE TEXT EXTRACTION
 # ==============================
 def extract_text(file):
     text = ""
@@ -86,31 +87,49 @@ def extract_text(file):
 
             if result.get("ParsedResults"):
                 text = result["ParsedResults"][0]["ParsedText"]
-            else:
-                text = "No readable text found in image."
+        except Exception:
+            text = ""
 
-        except Exception as e:
-            text = f"OCR failed: {str(e)}"
-
-    if not text.strip():
-        text = "No text could be extracted from the file."
-
-    return text
+    return text.strip()
 
 # ==============================
-# 🧠 SESSION STATE
+# SIMPLE RAG RETRIEVAL (IMPORTANT)
 # ==============================
-if "history" not in st.session_state:
-    st.session_state.history = []
-if "current_chat" not in st.session_state:
-    st.session_state.current_chat = []
-if "doc_text" not in st.session_state:
-    st.session_state.doc_text = ""
-if "last_file" not in st.session_state:
-    st.session_state.last_file = None
+def get_relevant_chunks(text, query, chunk_size=500, top_k=4):
+    words = query.lower().split()
+
+    chunks = [text[i:i+chunk_size] for i in range(0, len(text), chunk_size)]
+
+    scored = []
+    for chunk in chunks:
+        score = sum(1 for w in words if w in chunk.lower())
+        scored.append((score, chunk))
+
+    scored.sort(reverse=True, key=lambda x: x[0])
+
+    return "\n".join([c[1] for c in scored[:top_k]])
 
 # ==============================
-# 🤖 LLM
+# PDF GENERATOR
+# ==============================
+def generate_pdf(history):
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    for chat in history:
+        elements.append(Paragraph(f"<b>User:</b> {chat['question']}", styles["Normal"]))
+        elements.append(Spacer(1, 8))
+        elements.append(Paragraph(f"<b>Assistant:</b> {chat['answer']}", styles["Normal"]))
+        elements.append(Spacer(1, 12))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer
+
+# ==============================
+# LLM
 # ==============================
 llm = ChatGroq(
     temperature=0.7,
@@ -119,7 +138,7 @@ llm = ChatGroq(
 )
 
 # ==============================
-# 🖥️ MAIN UI
+# UI HEADER
 # ==============================
 st.markdown("<h1 style='text-align:center;'>🤖 Nexa AI</h1>", unsafe_allow_html=True)
 
@@ -128,7 +147,7 @@ for chat in st.session_state.current_chat:
     st.chat_message("assistant").write(chat["answer"])
 
 # ==============================
-# 📂 SIDEBAR
+# SIDEBAR
 # ==============================
 with st.sidebar:
     st.title("📜 Chat History")
@@ -136,25 +155,26 @@ with st.sidebar:
 
     uploaded_file = st.file_uploader("📄 Upload file")
 
+    if st.session_state.file_reset:
+        uploaded_file = None
+        st.session_state.file_reset = False
+
     if uploaded_file:
         if st.session_state.last_file != uploaded_file.name:
             st.session_state.last_file = uploaded_file.name
+            st.session_state.doc_loaded = False
+            st.session_state.doc_text = ""
 
-            progress = st.progress(0)
-            status_text = st.empty()
+        if not st.session_state.doc_loaded:
+            with st.spinner("📄 Processing document..."):
+                text = extract_text(uploaded_file)
+                st.session_state.doc_text = text
+                st.session_state.doc_loaded = True
 
-            status_text.markdown("📄 **Processing your document...**")
-
-            progress.progress(50)
-            text = extract_text(uploaded_file)
-
-            progress.progress(100)
-            st.session_state.doc_text = text
-
-            status_text.markdown("✅ **Document ready!**")
-
-            progress.empty()
-            status_text.empty()
+            if text and len(text.strip()) > 20:
+                st.success("✅ Document processed successfully")
+            else:
+                st.warning("⚠️ No readable text found")
 
     st.markdown("---")
 
@@ -170,48 +190,83 @@ with st.sidebar:
         st.session_state.current_chat = []
         st.session_state.doc_text = ""
         st.session_state.last_file = None
+        st.session_state.doc_loaded = False
+        st.session_state.file_reset = True
         st.rerun()
 
-    st.download_button("📥 Download Chat", generate_pdf(st.session_state.history), "chat.pdf")
+    st.download_button(
+        "📥 Download Chat",
+        generate_pdf(st.session_state.history),
+        "chat.pdf"
+    )
 
 # ==============================
-# 💬 CHAT INPUT
+# CHAT INPUT (HYBRID LOGIC FIX)
 # ==============================
 user_input = st.chat_input("Ask something...")
 
 if user_input:
     question = user_input.lower()
-
-    if any(word in question for word in ["short", "brief"]):
-        style_instruction = "Answer in very short 2-3 lines."
-    elif any(word in question for word in ["detailed", "explain", "deep"]):
-        style_instruction = "Give a detailed and well-explained answer."
-    else:
-        style_instruction = "Answer normally."
-
     context = st.session_state.doc_text
 
-    prompt = f"""
+    has_doc = context and len(context.strip()) > 50
+
+    # STYLE
+    if "short" in question:
+        style = "Answer in 2-3 lines."
+    elif "detailed" in question:
+        style = "Give detailed explanation."
+    else:
+        style = "Answer normally."
+
+    # DOCUMENT INTENT CHECK
+    doc_keywords = ["document", "file", "uploaded", "this document", "from document"]
+    is_doc_question = any(word in question for word in doc_keywords)
+
+    # ==============================
+    # 🔥 HYBRID LOGIC (MAIN FIX)
+    # ==============================
+
+    if has_doc and is_doc_question:
+        relevant_context = get_relevant_chunks(context, question)
+
+        prompt = f"""
+You are a document QA assistant.
+
+Use ONLY the document below.
+If answer is not present say:
+"This information is not available in the document."
+
+{style}
+
+DOCUMENT:
+{relevant_context}
+
+QUESTION:
+{question}
+"""
+
+    else:
+        prompt = f"""
 You are a helpful AI assistant.
 
-{style_instruction}
+Answer using general knowledge.
 
-Context:
-{context}
+{style}
 
-Question:
+QUESTION:
 {question}
 """
 
     answer = llm.invoke(prompt).content
 
     st.session_state.history.append({"question": question, "answer": answer})
-    st.session_state.current_chat = [{"question": question, "answer": answer}]
+    st.session_state.current_chat.append({"question": question, "answer": answer})
 
     st.rerun()
 
 # ==============================
-# Footer
+# FOOTER
 # ==============================
 st.markdown("""
 <hr>
