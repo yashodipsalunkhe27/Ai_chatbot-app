@@ -185,13 +185,16 @@ with st.sidebar:
 
     st.markdown("---")
 
+with st.sidebar:
+
+    st.markdown("---")
+
     if st.button("🧹 Clear Chat"):
         st.session_state.history = []
         st.session_state.current_chat = []
         st.session_state.doc_text = ""
         st.session_state.last_file = None
         st.session_state.doc_loaded = False
-        st.session_state.file_reset = True
         st.rerun()
 
     st.download_button(
