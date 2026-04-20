@@ -1,34 +1,30 @@
 import streamlit as st
+
+# ✅ MUST BE FIRST STREAMLIT COMMAND
+st.set_page_config(page_title="AI Chatbot", page_icon="🤖", layout="wide")
+
 import os
 from dotenv import load_dotenv
 from langchain_groq import ChatGroq
 import io
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet
-
 from pypdf import PdfReader
 from PIL import Image
 import requests
 
-# ✅ FIX 1: Force session initialization
-st.session_state
-
 # ==============================
-# 🎨 UI CONFIG (SAME)
+# 🎨 UI CONFIG
 # ==============================
-st.set_page_config(page_title="AI Chatbot", page_icon="🤖", layout="wide")
-
 st.markdown("""
 <style>
 .stApp {
     background: linear-gradient(135deg, #1a102a, #2a1b3d, #3b2a5a);
     color: #f5f3ff;
 }
-
 [data-testid="stSidebar"] {
     background: #1a102a !important;
 }
-
 section[data-testid="stChatInput"] textarea {
     background: #2a1b3d !important;
     color: #f5f3ff !important;
@@ -48,7 +44,7 @@ if not api_key:
     st.stop()
 
 # ==============================
-# 📄 PDF GENERATOR (SAME)
+# 📄 PDF GENERATOR
 # ==============================
 def generate_pdf(history):
     buffer = io.BytesIO()
@@ -67,7 +63,7 @@ def generate_pdf(history):
     return buffer
 
 # ==============================
-# 📄 TEXT EXTRACTION (SAME)
+# 📄 TEXT EXTRACTION
 # ==============================
 def extract_text(file):
     text = ""
@@ -86,7 +82,6 @@ def extract_text(file):
                 files={"file": file},
                 data={"apikey": "helloworld"}
             )
-
             result = response.json()
 
             if result.get("ParsedResults"):
@@ -103,7 +98,7 @@ def extract_text(file):
     return text
 
 # ==============================
-# 🧠 SESSION STATE (SAME)
+# 🧠 SESSION STATE
 # ==============================
 if "history" not in st.session_state:
     st.session_state.history = []
@@ -115,7 +110,7 @@ if "last_file" not in st.session_state:
     st.session_state.last_file = None
 
 # ==============================
-# 🤖 LLM (SAME)
+# 🤖 LLM
 # ==============================
 llm = ChatGroq(
     temperature=0.7,
@@ -124,7 +119,7 @@ llm = ChatGroq(
 )
 
 # ==============================
-# 🖥️ MAIN UI (SAME)
+# 🖥️ MAIN UI
 # ==============================
 st.markdown("<h1 style='text-align:center;'>🤖 Nexa AI</h1>", unsafe_allow_html=True)
 
@@ -133,7 +128,7 @@ for chat in st.session_state.current_chat:
     st.chat_message("assistant").write(chat["answer"])
 
 # ==============================
-# 📂 SIDEBAR (SAME)
+# 📂 SIDEBAR
 # ==============================
 with st.sidebar:
     st.title("📜 Chat History")
@@ -180,7 +175,7 @@ with st.sidebar:
     st.download_button("📥 Download Chat", generate_pdf(st.session_state.history), "chat.pdf")
 
 # ==============================
-# 💬 CHAT INPUT (FIXED POSITION)
+# 💬 CHAT INPUT
 # ==============================
 user_input = st.chat_input("Ask something...")
 
@@ -213,10 +208,10 @@ Question:
     st.session_state.history.append({"question": question, "answer": answer})
     st.session_state.current_chat = [{"question": question, "answer": answer}]
 
-    st.rerun()  # ✅ important
+    st.rerun()
 
 # ==============================
-# Footer (SAME)
+# Footer
 # ==============================
 st.markdown("""
 <hr>
